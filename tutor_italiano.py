@@ -21,8 +21,9 @@ def home():
 # ==========================================
 # CONFIGURAÇÕES DE CHAVES E IDs
 # ==========================================
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '8913417725:AAHK9QH9Qke6h6BrU3cFwAa5yx5qlvHo-XY')
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
+# O Python vai puxar a chave em segredo do painel do Render:
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 GRUPO_ID = '-1004415878695' 
 LINK_DO_GRUPO = 'https://t.me/+_9bCJB4D8PBiODBk'
