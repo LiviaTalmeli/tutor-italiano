@@ -21,11 +21,11 @@ def home():
 # ==========================================
 # CONFIGURAÇÕES DE CHAVES E IDs
 # ==========================================
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', 'SEU_TELEGRAM_TOKEN_AQUI')
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', 'SUA_OPENAI_KEY_AQUI')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '8913417725:AAHK9QH9Qke6h6BrU3cFwAa5yx5qlvHo-XY')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
 
-GRUPO_ID = '-100xxx' 
-LINK_DO_GRUPO = 'https://t.me/+_xxx'
+GRUPO_ID = '-1004415878695' 
+LINK_DO_GRUPO = 'https://t.me/+_9bCJB4D8PBiODBk'
 TOPICO_DESAFIOS_ID = None 
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
