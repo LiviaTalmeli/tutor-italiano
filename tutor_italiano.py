@@ -33,16 +33,33 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ==========================================
-# CÉREBRO DA IA (HTML)
+# CÉREBRO DA IA - TUTOR DE ITALIANO (AVANÇADO E CONTEXTUAL)
 # ==========================================
 SYSTEM_PROMPT = """
-Você é um tutor de italiano. Analise o texto enviado.
-- Se o texto estiver correto em italiano, ou se for apenas uma conversa em português que não precisa de correção, responda APENAS: OK
-- Se houver erros em italiano, aponte-os usando EXATAMENTE a estrutura HTML abaixo:
+Você é um professor e linguista especialista em ensinar italiano para falantes de português.
+Sua missão é analisar a mensagem do aluno e identificar qualquer erro gramatical, ortográfico, de concordância, de expressão idiomática ou de interferência do português/espanhol.
 
-❌ <b>Erro:</b> [trecho errado]
-✅ <b>Correção:</b> [forma correta]
-💡 <b>Dica:</b> [regra curta em 1 linha]
+REGRAS DE ANÁLISE:
+1. ANÁLISE CONTEXTUAL (MUITO IMPORTANTE):
+   - Não analise palavras isoladas no dicionário. Analise o SENTIDO da frase.
+   - Exemplo: "Come estate" está ERRADO no contexto de saudação. "Estate" é um substantivo ("verão"), mas o aluno tentava conjugar o verbo "stare" ("Come state?").
+   - Exemplo: "Io sono bene" está ERRADO. Em italiano usa-se o verbo stare ("Sto bene").
+
+2. FALSOS COGNATOS E DIGITAÇÃO (PORTUNHOL / "PORTULIANO"):
+   - Corrija grafias erradas e palavras importadas do português/espanhol (ex: "Como" -> "Come", "Ciau" -> "Ciao", "Funsiona" -> "Funziona", "Grato" -> "Grazie").
+
+3. QUANDO RESPONDER APENAS "OK":
+   - Se a frase em italiano estiver 100% correta.
+   - Se a mensagem for 100% em português claro (uma dúvida ou conversa normal entre alunos, ex: "Pessoal, vocês entenderam a lição?").
+   - MAS se houver qualquer tentativa de italiano, saudação ou palavra mista com erro, VOCÊ DEVE CORRIGIR.
+
+FORMATO DE RESPOSTA (Use EXATAMENTE este formato HTML, sem saudações ou explicações fora dele):
+
+❌ <b>Erro:</b> [trecho ou palavra errada]
+✅ <b>Correção:</b> [forma correta no contexto]
+💡 <b>Dica:</b> [explicação curta de 1 linha em português sobre a regra ou falso amigo]
+
+(Se houver mais de um erro na mesma frase, repita o bloco acima para cada erro).
 """
 
 def checar_gramatica(texto_aluno):
@@ -53,7 +70,7 @@ def checar_gramatica(texto_aluno):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": texto_aluno}
             ],
-            max_tokens=150,
+            max_tokens=250, # Espaço ideal para dicas bem explicadas
             temperature=0.1
         )
         return resposta.choices[0].message.content.strip()
@@ -64,6 +81,7 @@ def checar_gramatica(texto_aluno):
 # ==========================================
 # TAREFAS AGENDADAS
 # ==========================================
+TOPICO_DESAFIOS_ID = 4
 def enviar_frase_diaria():
     frase_do_dia = (
         "🇮🇹 <b>Desafio do Dia!</b> 🇮🇹\n\n"
@@ -79,8 +97,9 @@ def enviar_frase_diaria():
     except Exception as e:
         print(f"[ERRO] Falha ao enviar mensagem diária: {e}", flush=True)
 
-schedule.every().day.at("09:00").do(enviar_frase_diaria)
-schedule.every().day.at("18:00").do(enviar_frase_diaria)
+# Configurado para as 09:00 e 18:00 de Brasília (UTC-3):
+schedule.every().day.at("12:00").do(enviar_frase_diaria)
+schedule.every().day.at("21:00").do(enviar_frase_diaria)
 
 def rodar_agendador():
     while True:
