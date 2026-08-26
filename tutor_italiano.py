@@ -180,20 +180,20 @@ def monitorar_mensagens_grupo(message):
 # INICIAR O BOT
 # ==========================================
 def run_bot():
-    print("⏳ Aguardando 5 segundos para limpar conexões antigas...", flush=True)
-    time.sleep(5)
+    print("⏳ Aguardando 15 segundos para o Render desligar a versão antiga...", flush=True)
+    time.sleep(15)
+    
     try:
         bot.remove_webhook()
     except Exception:
         pass
     
-    print("🤖 Bot conectado via Polling e pronto para escutar o grupo!", flush=True)
+    print("🤖 Bot conectado e escutando mensagens!", flush=True)
     while True:
         try:
-            # allowed_updates garante que o Telegram mande mensagens de grupos
             bot.infinity_polling(timeout=60, long_polling_timeout=60, allowed_updates=['message', 'edited_message'])
         except Exception as e:
-            print(f"[ERRO Polling] {e}", flush=True)
+            print(f"⚠️ [Conexão reiniciando em 10s]: {e}", flush=True)
             time.sleep(10)
 
 if __name__ == '__main__':
