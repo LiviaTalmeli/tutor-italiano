@@ -36,35 +36,63 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ==========================================
-# CÉREBRO DA IA - PROMPT DO PROFESSOR (ULTRA OTIMIZADO)
+# CÉREBRO DA IA (Ajustado para HTML seguro)
 # ==========================================
 SYSTEM_PROMPT = """
-Corrija o italiano da mensagem. Se estiver correta, responda APENAS "OK".
-Se houver erros, liste-os de forma EXTREMAMENTE concisa usando EXATAMENTE o formato abaixo.
+Você é um professor de italiano. Analise a mensagem enviada.
+- Se a mensagem estiver em italiano correto OU se for apenas uma saudação/conversa que não precisa de correção, responda APENAS: OK
+- Se houver erros em italiano, aponte-os usando EXATAMENTE a estrutura HTML abaixo:
 
-❌ **Erro:** [Apenas a palavra ou trecho curto errado]
-✅ **Correção:** [Apenas a forma correta correspondente]
-💡 **Dica:** [Explicação da regra em no máximo 1 linha]
-
-(Se houver mais de um erro na mesma frase, repita o bloco acima para cada erro. Não adicione saudações ou textos extras).
+❌ <b>Erro:</b> [trecho errado]
+✅ <b>Correção:</b> [forma correta]
+💡 <b>Dica:</b> [explicação curta de 1 linha]
 """
 
-def checar_gramatica(texto_aluno):
-    """Envia o texto para a OpenAI com foco total em economia de tokens."""
-    try:
-        resposta = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": texto_aluno}
-            ],
-            max_tokens=150, # Reduzido ainda mais, pois agora a saída é curtíssima
-            temperature=0.1 # Mantém a IA focada e sem enrolação
-        )
-        return resposta.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"[ERRO OpenAI] Falha ao consultar a API: {e}")
-        return "OK"
+# ==========================================
+# OUVINTE DE MENSAGENS NO GRUPO COM LOGS DETALHADOS
+# ==========================================
+@bot.message_handler(content_types=['text'], func=lambda message: message.chat.type in ['group', 'supergroup'])
+def monitorar_mensagens_grupo(message):
+    nome = message.from_user.first_name if message.from_user else "Desconhecido"
+    texto = message.text
+
+    print(f"\n📩 [NOVA MENSAGEM NO GRUPO] De: {nome} | Texto: '{texto}'")
+
+    # 1. Verifica se é bot
+    if message.from_user and message.from_user.is_bot:
+        print("⏩ Ignorado: Enviado por um bot.")
+        return
+
+    # 2. Verifica se é admin anônimo
+    if message.sender_chat is not None:
+        print("⚠️ Ignorado: Enviado como Admin Anônimo ou Canal. Desative 'Permanecer Anônimo' para testar.")
+        return
+        
+    user_id = message.from_user.id
+    
+    # 3. Ignora comandos
+    if texto.startswith('/'):
+        print("⏩ Ignorado: É um comando com /.")
+        return
+
+    print("🤖 Consultando a OpenAI...")
+    correcao = checar_gramatica(texto)
+    print(f"🔍 Resposta da OpenAI: {repr(correcao)}")
+
+    # 4. Verifica se a IA encontrou erro
+    if correcao.strip().upper() not in ["OK", "OK.", "OK!"]:
+        print(f"📤 Tentando enviar correção no privado para {nome} (ID: {user_id})...")
+        try:
+            bot.send_message(
+                chat_id=user_id,
+                text=f"📌 <b>Ajuste na sua mensagem enviada no grupo:</b>\n\n{correcao}",
+                parse_mode="HTML"
+            )
+            print(f"✅ SUCESSO: Correção entregue no privado de {nome}!")
+        except Exception as e:
+            print(f"❌ ERRO ao enviar mensagem no privado: {e}")
+    else:
+        print("ℹ️ Nenhuma correção necessária (IA respondeu OK).")
 
 # ==========================================
 # TAREFAS AGENDADAS (MENSAGEM DIÁRIA)
@@ -95,62 +123,6 @@ def rodar_agendador():
     while True:
         schedule.run_pending()
         time.sleep(1)
-
-# ==========================================
-# OUVINTE DE MENSAGENS NO PRIVADO (ONBOARDING)
-# ==========================================
-@bot.message_handler(commands=['start'], func=lambda message: message.chat.type == 'private')
-def dar_boas_vindas(message):
-    # Cria o botão de acesso ao grupo
-    markup = InlineKeyboardMarkup()
-    botao_grupo = InlineKeyboardButton("Entrar na Comunidade 🇮🇹", url=LINK_DO_GRUPO)
-    markup.add(botao_grupo)
-
-    texto = (
-        "Ciao! 👋 Eu sou o assistente do Método Italiano.\n\n"
-        "Para começar a praticar e receber minhas correções, você precisa entrar no nosso grupo oficial!\n\n"
-        "👇 Clique no botão abaixo para entrar:"
-    )
-    bot.send_message(message.chat.id, texto, reply_markup=markup)
-
-@bot.message_handler(func=lambda message: message.chat.type == 'private' and not message.text.startswith('/'))
-def conversa_privada(message):
-    bot.send_message(
-        message.chat.id, 
-        "💬 Eu fico apenas observando as conversas lá no **grupo da comunidade**! Vá lá interagir com o pessoal e, se tiver algum errinho de italiano na sua mensagem, eu te dou um toque por aqui. 😉",
-        parse_mode="Markdown"
-    )
-
-# ==========================================
-# OUVINTE DE MENSAGENS NO GRUPO (CORREÇÃO)
-# ==========================================
-@bot.message_handler(content_types=['text'], func=lambda message: message.chat.type in ['group', 'supergroup'])
-def monitorar_mensagens_grupo(message):
-    # 🛡️ Ignora bots (inclusive ele mesmo) e admins que enviam mensagens anonimamente
-    if message.from_user.is_bot or message.sender_chat is not None:
-        return
-        
-    texto = message.text
-    user_id = message.from_user.id
-    
-    # Ignora comandos de barra (ex: /start, /help) enviados no grupo
-    if texto.startswith('/'):
-        return
-
-    # Manda a mensagem do aluno para a IA analisar
-    correcao = checar_gramatica(texto)
-
-    # Se a IA não responder "OK", significa que ela encontrou erros e gerou o texto de correção
-    if correcao != "OK":
-        try:
-            bot.send_message(
-                chat_id=user_id,
-                text=f"📌 **Ajuste na sua mensagem enviada no grupo:**\n\n{correcao}",
-                parse_mode="Markdown"
-            )
-            print(f"[LOG] Correção enviada para {message.from_user.first_name}.")
-        except Exception as e:
-            print(f"[ERRO] Falha ao enviar para {message.from_user.first_name}. O usuário possivelmente não iniciou o bot. Erro: {e}")
 
 # ==========================================
 # INICIAR O BOT, O AGENDADOR E O FLASK
