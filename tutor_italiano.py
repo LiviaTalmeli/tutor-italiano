@@ -8,61 +8,55 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from openai import OpenAI
 import schedule
 
-# Força o Python a mostrar TODOS os prints imediatamente no Render (sem travar em buffer)
+# Força o Python a mostrar os logs no Render em tempo real
 sys.stdout.reconfigure(line_buffering=True)
 
-# 1. Cria o aplicativo do Flask
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot está rodando com sucesso!"
+    return "Bot de Italiano rodando com sucesso!"
 
 # ==========================================
 # CONFIGURAÇÕES DE CHAVES E IDs
 # ==========================================
-# O Python vai puxar a chave em segredo do painel do Render:
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 GRUPO_ID = '-1004415878695' 
-LINK_DO_GRUPO = 'https://t.me/+_9bCJB4D8PBiODBk'
-TOPICO_DESAFIOS_ID = None 
+LINK_DO_GRUPO = 'https://t.me/+_9bCJB4D8PBiODBk' # Seu link de convite
+TOPICO_DESAFIOS_ID = 4 # ID do tópico Giornale
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ==========================================
-# CÉREBRO DA IA - TUTOR DE ITALIANO (AVANÇADO E CONTEXTUAL)
+# CÉREBRO 1: TUTOR DE CORREÇÃO EXAUSTIVA
 # ==========================================
 SYSTEM_PROMPT = """
-Você é um professor e linguista especialista em ensinar italiano para falantes de português.
-Sua missão é analisar a mensagem do aluno e identificar qualquer erro gramatical, ortográfico, de concordância, de expressão idiomática ou de interferência do português/espanhol.
+Você é um professor e linguista nativo especialista em ensinar italiano para brasileiros.
+Sua missão é analisar minuciosamente a mensagem do aluno e identificar TODOS os erros existentes.
 
-REGRAS DE ANÁLISE:
-1. ANÁLISE CONTEXTUAL (MUITO IMPORTANTE):
-   - Não analise palavras isoladas no dicionário. Analise o SENTIDO da frase.
-   - Exemplo: "Come estate" está ERRADO no contexto de saudação. "Estate" é um substantivo ("verão"), mas o aluno tentava conjugar o verbo "stare" ("Come state?").
-   - Exemplo: "Io sono bene" está ERRADO. Em italiano usa-se o verbo stare ("Sto bene").
+REGRAS OBRIGATÓRIAS:
+1. NÃO PARE NO PRIMEIRO ERRO: Analise a frase inteira de ponta a ponta. Se houver 2 ou mais erros na mesma mensagem (ex: "grazi mili" -> corrija "grazie" E "mille"; "io volere un pizza" -> corrija "vorrei" E "una"), liste TODOS os erros.
+2. ANÁLISE CONTEXTUAL: Não avalie palavras soltas no dicionário. Analise o sentido da frase (ex: "Come estate" está errado para saudação -> o correto é "Come state?").
+3. ERROS DE GRAFIA E PORTUNHOL: Corrija qualquer falso amigo ou erro de letra (ex: "grazi" -> "grazie", "mili" -> "mille", "funsiona" -> "funziona", "ciau" -> "ciao").
+4. QUANDO RESPONDER APENAS "OK":
+   - Se o italiano estiver 100% correto.
+   - Se a mensagem for 100% uma conversa em português entre alunos (ex: "Gente, que horas é a aula?").
+   - Mas se houver qualquer tentativa de italiano com erro, CORRIJA.
 
-2. FALSOS COGNATOS E DIGITAÇÃO (PORTUNHOL / "PORTULIANO"):
-   - Corrija grafias erradas e palavras importadas do português/espanhol (ex: "Como" -> "Come", "Ciau" -> "Ciao", "Funsiona" -> "Funziona", "Grato" -> "Grazie").
+FORMATO DE RESPOSTA (Use estritamente este formato HTML):
 
-3. QUANDO RESPONDER APENAS "OK":
-   - Se a frase em italiano estiver 100% correta.
-   - Se a mensagem for 100% em português claro (uma dúvida ou conversa normal entre alunos, ex: "Pessoal, vocês entenderam a lição?").
-   - MAS se houver qualquer tentativa de italiano, saudação ou palavra mista com erro, VOCÊ DEVE CORRIGIR.
+❌ <b>Erro:</b> [trecho errado]
+✅ <b>Correção:</b> [forma correta]
+💡 <b>Dica:</b> [explicação curta de 1 linha em português]
 
-FORMATO DE RESPOSTA (Use EXATAMENTE este formato HTML, sem saudações ou explicações fora dele):
-
-❌ <b>Erro:</b> [trecho ou palavra errada]
-✅ <b>Correção:</b> [forma correta no contexto]
-💡 <b>Dica:</b> [explicação curta de 1 linha em português sobre a regra ou falso amigo]
-
-(Se houver mais de um erro na mesma frase, repita o bloco acima para cada erro).
+(Se houver múltiplos erros, repita o bloco acima para cada erro individual).
 """
 
 def checar_gramatica(texto_aluno):
+    """Envia o texto para a OpenAI corrigir todos os erros."""
     try:
         resposta = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -70,35 +64,75 @@ def checar_gramatica(texto_aluno):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": texto_aluno}
             ],
-            max_tokens=250, # Espaço ideal para dicas bem explicadas
+            max_tokens=350, # Espaço para múltiplos erros sem cortar
             temperature=0.1
         )
         return resposta.choices[0].message.content.strip()
     except Exception as e:
-        print(f"[ERRO OpenAI] Falha na API: {e}", flush=True)
+        print(f"[ERRO OpenAI Correção] {e}", flush=True)
         return "OK"
 
 # ==========================================
-# TAREFAS AGENDADAS
+# CÉREBRO 2: CRIADOR DE DESAFIOS DINÂMICOS
 # ==========================================
-TOPICO_DESAFIOS_ID = 4
+PROMPT_CRIAR_DESAFIO = """
+Você é um professor de italiano carismático e engajador da comunidade "Método Viare / Italiano na Prática".
+Crie um desafio interativo, variado e envolvente para os alunos praticarem no grupo.
+
+VARIE OS TIPOS DE DESAFIO (Escolha 1 estilo aleatoriamente a cada execução):
+1. Situação do cotidiano na Itália (pedir algo no restaurante, farmácia, aeroporto, hotel, pedir informações).
+2. Pergunta de conversação aberta (ex: "Raccontaci: qual è la tua città italiana preferita e perché?").
+3. Desafio de tradução ou completar a frase (ex: frases úteis do dia a dia).
+4. Falso amigo ou dica cultural com pergunta no final.
+
+ESTRUTURA DA MENSAGEM:
+- Título chamativo com emojis (ex: 🇮🇹 <b>Desafio do Dia!</b> 🇮🇹 ou ☕ <b>Momento Prática!</b> 🍕).
+- O desafio ou pergunta bem explicada.
+- Chamada para ação amigável convidando todos a responderem no grupo.
+- FORMATO: Use EXCLUSIVAMENTE tags HTML (<b>, <i>). NUNCA use markdown com asteriscos.
+- Máximo 5 a 6 linhas, direto ao ponto e motivador.
+"""
+
+def gerar_desafio_ia():
+    """Gera um desafio inédito e criativo usando a IA."""
+    try:
+        resposta = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": PROMPT_CRIAR_DESAFIO},
+                {"role": "user", "content": "Crie um desafio inédito e criativo de italiano para a comunidade hoje."}
+            ],
+            max_tokens=300,
+            temperature=0.9 # Alta criatividade para nunca repetir mensagens
+        )
+        return resposta.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"[ERRO OpenAI Desafio] {e}", flush=True)
+        return (
+            "🇮🇹 <b>Desafio do Dia!</b> 🇮🇹\n\n"
+            "Como você diria em italiano: <i>'Muito prazer em conhecê-lo'</i>?\n\n"
+            "💬 <i>Responda aqui no grupo para praticar!</i>"
+        )
+
+# ==========================================
+# TAREFAS AGENDADAS (DESAFIOS DINÂMICOS)
+# ==========================================
 def enviar_frase_diaria():
-    frase_do_dia = (
-        "🇮🇹 <b>Desafio do Dia!</b> 🇮🇹\n\n"
-        "Como você diria: <i>'Eu gostaria de um café, por favor'</i> em italiano?\n\n"
-        "Responda aqui para praticar!"
-    )
+    print("⏰ [AGENDADOR] Gerando novo desafio inédito com IA...", flush=True)
+    frase_do_dia = gerar_desafio_ia()
+    
     try:
         if TOPICO_DESAFIOS_ID:
             bot.send_message(GRUPO_ID, frase_do_dia, message_thread_id=TOPICO_DESAFIOS_ID, parse_mode="HTML")
         else:
             bot.send_message(GRUPO_ID, frase_do_dia, parse_mode="HTML")
-        print("[LOG] Mensagem diária enviada com sucesso!", flush=True)
+        print("[LOG] Desafio dinâmico enviado no tópico com sucesso!", flush=True)
     except Exception as e:
         print(f"[ERRO] Falha ao enviar mensagem diária: {e}", flush=True)
 
-# Configurado para as 09:00 e 18:00 de Brasília (UTC-3):
+# 09:00, 13:00 e 18:00 de Brasília (12:00, 16:00 e 21:00 UTC)
 schedule.every().day.at("12:00").do(enviar_frase_diaria)
+schedule.every().day.at("16:00").do(enviar_frase_diaria)
 schedule.every().day.at("21:00").do(enviar_frase_diaria)
 
 def rodar_agendador():
@@ -107,7 +141,7 @@ def rodar_agendador():
         time.sleep(1)
 
 # ==========================================
-# OUVINTE NO PRIVADO
+# OUVINTES NO PRIVADO
 # ==========================================
 @bot.message_handler(commands=['start'], func=lambda message: message.chat.type == 'private')
 def dar_boas_vindas(message):
@@ -117,10 +151,17 @@ def dar_boas_vindas(message):
 
     texto = (
         "Ciao! 👋 Eu sou o assistente do Método Italiano.\n\n"
-        "Para começar a praticar e receber minhas correções, você precisa entrar no nosso grupo oficial!\n\n"
+        "Para começar a praticar e receber minhas correções, entre no nosso grupo oficial!\n\n"
         "👇 Clique no botão abaixo para entrar:"
     )
     bot.send_message(message.chat.id, texto, reply_markup=markup)
+
+# Comando para você testar a geração do desafio a qualquer momento
+@bot.message_handler(commands=['gerar_desafio'], func=lambda message: message.chat.type == 'private')
+def testar_desafio_manual(message):
+    bot.send_message(message.chat.id, "🤖 Gerando um desafio inédito com a IA e enviando no tópico Giornale...")
+    enviar_frase_diaria()
+    bot.send_message(message.chat.id, "✅ Desafio enviado!")
 
 @bot.message_handler(func=lambda message: message.chat.type == 'private' and not message.text.startswith('/'))
 def conversa_privada(message):
@@ -131,7 +172,7 @@ def conversa_privada(message):
     )
 
 # ==========================================
-# OUVINTE GLOBAL NO GRUPO (COM LOGS IMEDIATOS)
+# OUVINTE NO GRUPO (CORREÇÃO DE MENSAGENS)
 # ==========================================
 @bot.message_handler(content_types=['text'], func=lambda message: message.chat.type in ['group', 'supergroup'])
 def monitorar_mensagens_grupo(message):
@@ -139,61 +180,45 @@ def monitorar_mensagens_grupo(message):
     texto = message.text
     user_id = message.from_user.id if message.from_user else None
 
-    # ESTE PRINT VAI APARECER NO RENDER NO MESMO SEGUNDO
-    print(f"\n🔔 [CHEGOU NO GRUPO] De: {nome} (ID: {user_id}) | Chat: {message.chat.title} ({message.chat.id}) | Texto: '{texto}'", flush=True)
+    print(f"\n🔔 [GRUPO] De: {nome} (ID: {user_id}) | Mensagem: '{texto}'", flush=True)
 
-    # 1. Ignora bots
-    if message.from_user and message.from_user.is_bot:
-        print("⏩ [IGNORADO] Mensagem enviada por bot.", flush=True)
-        return
-
-    # 2. Verifica se é admin anônimo
-    if message.sender_chat is not None and user_id is None:
-        print("⚠️ [AVISO] Mensagem enviada como Anônimo/Canal. O bot não tem o ID privado para responder.", flush=True)
+    if (message.from_user and message.from_user.is_bot) or message.sender_chat is not None:
         return
         
-    # 3. Ignora comandos
     if texto.startswith('/'):
-        print("⏩ [IGNORADO] Comando de barra.", flush=True)
         return
 
-    print("🤖 [IA] Enviando para OpenAI analisar...", flush=True)
     correcao = checar_gramatica(texto)
-    print(f"🔍 [IA] Resposta da OpenAI: {repr(correcao)}", flush=True)
+    print(f"🔍 [IA] Resposta:\n{correcao}", flush=True)
 
-    # 4. Envia no privado se houver correção
     if correcao.strip().upper() not in ["OK", "OK.", "OK!"]:
-        print(f"📤 [TELEGRAM] Enviando correção para o privado de {nome} (ID: {user_id})...", flush=True)
         try:
             bot.send_message(
                 chat_id=user_id,
                 text=f"📌 <b>Ajuste na sua mensagem enviada no grupo:</b>\n\n{correcao}",
                 parse_mode="HTML"
             )
-            print(f"✅ [SUCESSO] Correção entregue no privado de {nome}!", flush=True)
+            print(f"✅ [SUCESSO] Correção enviada para {nome}!", flush=True)
         except Exception as e:
-            print(f"❌ [ERRO AO ENVIAR NO PRIVADO] Motivo: {e}", flush=True)
-    else:
-        print("ℹ️ [IA] Nenhuma correção necessária (resposta foi OK).", flush=True)
+            print(f"❌ [ERRO] Falha ao enviar no privado: {e}", flush=True)
 
 # ==========================================
-# INICIAR O BOT
+# INICIAR O SERVIÇO
 # ==========================================
 def run_bot():
-    print("⏳ Aguardando 15 segundos para o Render desligar a versão antiga...", flush=True)
-    time.sleep(15)
-    
+    print("⏳ Aguardando 10 segundos para iniciar...", flush=True)
+    time.sleep(10)
     try:
         bot.remove_webhook()
     except Exception:
         pass
     
-    print("🤖 Bot conectado e escutando mensagens!", flush=True)
+    print("🤖 Bot conectado e escutando!", flush=True)
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=60, allowed_updates=['message', 'edited_message'])
         except Exception as e:
-            print(f"⚠️ [Conexão reiniciando em 10s]: {e}", flush=True)
+            print(f"⚠️ [Reconectando]: {e}", flush=True)
             time.sleep(10)
 
 if __name__ == '__main__':
@@ -207,6 +232,3 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=porta_render)
 
 
-    # 3. Servidor Web Flask (para o Render manter o serviço ativo)
-    porta_render = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=porta_render)
