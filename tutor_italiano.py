@@ -10,7 +10,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from openai import OpenAI
 import schedule
 
-# Força o Python a mostrar os logs no Render em tempo real
+# Forces Python to show logs on Render in real time
 sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
@@ -20,20 +20,20 @@ def home():
     return "Bot de Italiano rodando com sucesso!"
 
 # ==========================================
-# CONFIGURAÇÕES DE CHAVES E IDs
+# KEYS AND IDs CONFIGURATION
 # ==========================================
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 GRUPO_ID = '-1004415878695' 
-LINK_DO_GRUPO = 'https://t.me/+_9bCJB4D8PBiODBk' # Seu link de convite
-TOPICO_DESAFIOS_ID = 4 # ID do tópico Giornale
+LINK_DO_GRUPO = 'https://t.me/+_9bCJB4D8PBiODBk' # Invite link
+TOPICO_DESAFIOS_ID = 4 # ID for Giornale topic
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ==========================================
-# CÉREBRO 1: TUTOR DE CORREÇÃO EXAUSTIVA
+# BRAIN 1: CORRECTION TUTOR
 # ==========================================
 SYSTEM_PROMPT = """
 Você é um professor e linguista nativo especialista em ensinar italiano para brasileiros.
@@ -66,7 +66,7 @@ def checar_gramatica(texto_aluno):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": texto_aluno}
             ],
-            max_tokens=350, # Espaço para múltiplos erros sem cortar
+            max_tokens=350, # Space for mistakes
             temperature=0.1
         )
         return resposta.choices[0].message.content.strip()
@@ -75,12 +75,12 @@ def checar_gramatica(texto_aluno):
         return "OK"
 
 # ==========================================
-# CÉREBRO 2: CRIADOR DE DESAFIOS DINÂMICOS
+# BRAIN 2: DYNAMIC CHALLENGES
 # ==========================================
 ARQUIVO_HISTORICO = "historico_desafios.json"
-# 1. Banco massivo de temas do cotidiano real (foge do clichê de pizza/gelato)
+# 1. Massive bank for daily topics
 TEMAS_COTIDIANO = [
-    # --- 🛒 COMPRAS E COMÉRCIO LOCAL ---
+    # --- 🛒 FOOD AND STORES ---
     "No supermercado (pesar frutas/legumes na balança, pegar sacola, passar no caixa)",
     "Na padaria / Forno italiano (pedir pão fresco por peso, fatias de focaccia, troco)",
     "Na salumeria / frios (pedir 'etti' de presunto, queijo ralado na hora, pedir para fatiar fino)",
@@ -89,13 +89,13 @@ TEMAS_COTIDIANO = [
     "Em lojas de roupas e calçados (perguntar se tem outro tamanho, provar no vestiário, liquidação 'saldi')",
     "Em lojas de eletrônicos ou bricolagem (comprar adaptador de tomada italiano, pilhas, lâmpada)",
     "Na tabaccheria (comprar bilhete de ônibus, recarga de celular, selo 'marca da bollo')",
-    # --- 🏥 SAÚDE E CUIDADOS ---
+    # --- 🏥 HEALTH AND CARE ---
     "Na farmácia (pedir remédio para dor de cabeça, curativo, pastilha de garganta, termômetro)",
     "No médico de família ou consulta (descrever sintomas simples, dor de estômago, febre)",
     "No dentista (descrever dor de dente, marcar uma limpeza ou retorno)",
     "No cabeleireiro ou barbearia (pedir para cortar só as pontas, aparar a barba, lavar o cabelo)",
     "Na ótica (ajustar óculos tortos, pedir líquido para lentes de contato)",
-    # --- 🚆 TRANSPORTE E DESLOCAMENTO ---
+    # --- 🚆 TRANSPORT ---
     "Na estação de trem (usar a máquina de bilhetes, validar o bilhete 'convalidare', achar a plataforma)",
     "No ônibus ou bonde (perguntar se passa em determinado ponto, avisar que vai descer)",
     "No metrô (comprar passe diário, catraca que travou, qual linha pegar)",
@@ -104,35 +104,35 @@ TEMAS_COTIDIANO = [
     "No posto de gasolina (pedir 'self' ou 'servito', calibrar pneus, abastecer diesel ou gasolina)",
     "Aluguel de carro ou bicicleta (pedir cadeirinha de bebê, perguntar sobre o seguro e franquia)",
     "Estacionamento na rua (entender as faixas azuis/brancas, pagar no parquímetro)",
-    # --- 🏠 CASA, CONDOMÍNIO E VIZINHANÇA ---
+    # --- 🏠 HOUSE AND NEIGHBOURHOOD ---
     "Com o vizinho de condomínio (cumprimentar no elevador, pedir para receber uma encomenda)",
     "Lixo e reciclagem (entender os dias da 'raccolta differenziata', onde jogar cada material)",
     "Problemas domésticos (chamar o encanador para vazamento, eletricista para queda de luz)",
     "Na lavanderia 'self-service' a moeda (comprar ficha 'gettone', escolher programa da secadora)",
     "Cozinhando em casa (pedir ajuda para cortar ingredientes, esquecer a panela no fogo)",
     "Faxina e organização (procurar a vassoura, pedir para tirar os sapatos ao entrar)",
-    # --- ☕ COMIDA E SOCIAL (MUITO ALÉM DA PIZZA) ---
+    # --- ☕ SOCIAL ---
     "No bar italiano tomando café (pedir café 'al banco' vs 'al tavolo', pedir água com ou sem gás)",
     "Na trattoria tradicional (pedir mesa do lado de fora, pedir sugestão do dia, pedir a conta)",
     "Pizzaria 'al taglio' por pedaço (pedir para aquecer o pedaço 'me la scaldi?', escolher sabores)",
     "Restrições e preferências (avisar que não pode glúten, lactose ou pedir prato vegetariano)",
     "Aperitivo de fim de tarde (pedir petiscos, escolher a bebida, brindar 'Cin cin!')",
-    # --- 💼 TRABALHO, ESTUDO E TECNOLOGIA ---
+    # --- 💼 WORK AND STUDY ---
     "No escritório ou home office (avisar que a internet caiu, convidar colega para uma pausa pro café)",
     "E-mail profissional rápido (pedir desculpas pelo atraso em responder, anexar um documento)",
     "Na universidade ou curso (pedir anotações emprestadas, perguntar data de uma prova)",
     "Wi-Fi e tecnologia (pedir a senha do Wi-Fi, reclamar de celular descarregado, cabo emprestado)",
-    # --- 🧳 VIAGENS, LAZER E HOTELARIA ---
+    # --- 🧳 TRAVEL ---
     "No hotel ou Airbnb (avisar horário de chegada tarde, pedir toalha extra, senha da portaria)",
     "Na praia italiana / Stabilimento balneare (alugar guarda-sol e espreguiçadeira, perguntar da praia livre)",
     "Na montanha ou trilha (perguntar se o caminho é fácil, pedir um chocolate quente no refúgio)",
     "No museu ou atração turística (comprar ingresso com desconto de estudante/idoso, fila prioritária)",
     "No cinema ou teatro (escolher assento na plateia, perguntar se o filme é legendado)",
-    # --- 📬 BUROCRACIA E SERVIÇOS DO DIA A DIA ---
+    # --- 📬 BUREOCRACY ---
     "Nos correios / Poste Italiane (retirar uma encomenda com aviso de chegada, mandar carta registrada)",
     "No banco ou caixa eletrônico / Bancomat (sacar dinheiro, cartão engolido pela máquina)",
     "Pedindo informações na rua (pedir para indicar onde fica a farmácia ou praça mais próxima)",
-    # --- 🌦️ PERRENGUES, EMOÇÕES E CONVERSA FIADA ---
+    # --- 🌦️ DAY-TO-DAY ---
     "Falando sobre o clima (reclamar do calor abafado 'afa', chuva repentina sem guarda-chuva)",
     "Perrengues do dia (esquecer a chave dentro de casa, perder o ônibus)",
     "Desculpas sinceras e atrasos (trânsito pesado, despertador que não tocou, imprevisto)",
@@ -140,7 +140,7 @@ TEMAS_COTIDIANO = [
     "Fazendo elogios sinceros (elogiar a roupa de alguém, o corte de cabelo, uma comida gostosa)",
     "Expressões de surpresa, alívio e pressa ('Che peccato!', 'Meno male!', 'Ho una fretta tremenda!')"
 ]
-# 2. Formatos variados de atividades
+# 2. Different formats
 FORMATOS_ATIVIDADE = [
     {
         "tipo": "Tradução prática (PT -> IT)",
@@ -167,7 +167,7 @@ FORMATOS_ATIVIDADE = [
         "instrucao": "Apresente uma expressão muito usada pelos italianos nativos e pergunte se sabem o que significa ou peça para usarem num exemplo."
     }
 ]
-# 3. Níveis de dificuldade com pesos (70% Fácil, 25% Médio, 5% Desafio Curioso)
+# 3. Levels of difficulty (70% Easy, 25% Medium, 5% Curiosity)
 NIVEIS_DIFICULDADE = [
     {"nivel": "Fácil / Iniciante (A1-A2)", "peso": 70, "dica": "Frases curtas, vocabulário essencial, verbos comuns no presente."},
     {"nivel": "Médio / Intermediário (B1)", "peso": 25, "dica": "Conectar duas ideias curtas, passado recente (passato prossimo) ou dar uma opinião simples."},
@@ -201,7 +201,7 @@ def salvar_no_historico(resumo):
         print(f"[AVISO] Não foi possível salvar histórico: {e}", flush=True)
 def sortear_parametros():
     """Sorteia a combinação única do desafio de hoje."""
-    # Sorteio ponderado para priorizar o nível mais fácil
+    # Prioritizes easier levels
     nivel_escolhido = random.choices(
         NIVEIS_DIFICULDADE,
         weights=[n["peso"] for n in NIVEIS_DIFICULDADE],
@@ -259,7 +259,7 @@ Garanta que seja fácil e convidativo para que iniciantes não tenham medo de te
         return random.choice(FALLBACKS_VARIADOS)
         
 # ==========================================
-# TAREFAS AGENDADAS (DESAFIOS DINÂMICOS)
+# DYNAMIC CHALLENGES
 # ==========================================
 def enviar_frase_diaria():
     print("⏰ [AGENDADOR] Gerando novo desafio inédito com IA...", flush=True)
@@ -273,8 +273,7 @@ def enviar_frase_diaria():
         print("[LOG] Desafio dinâmico enviado com sucesso!", flush=True)
     except Exception as e:
         print(f"[ERRO] Falha ao enviar mensagem diária: {e}", flush=True)
-# Horários configurados (09:00 e 18:00 de Brasília = 12:00 e 21:00 UTC)
-schedule.every().day.at("12:00").do(enviar_frase_diaria)
+# Configurated time (18:00 Brasília = 21:00 UTC)
 schedule.every().day.at("21:00").do(enviar_frase_diaria)
 def rodar_agendador():
     while True:
@@ -282,7 +281,7 @@ def rodar_agendador():
         time.sleep(1)
 
 # ==========================================
-# OUVINTES NO PRIVADO
+# ANSWERS ON DM
 # ==========================================
 @bot.message_handler(commands=['start'], func=lambda message: message.chat.type == 'private')
 def dar_boas_vindas(message):
@@ -297,7 +296,7 @@ def dar_boas_vindas(message):
     )
     bot.send_message(message.chat.id, texto, reply_markup=markup)
 
-# Comando para você testar a geração do desafio a qualquer momento
+# Try command
 @bot.message_handler(commands=['gerar_desafio'], func=lambda message: message.chat.type == 'private')
 def testar_desafio_manual(message):
     bot.send_message(message.chat.id, "🤖 Gerando um desafio inédito com a IA e enviando no tópico Giornale...")
@@ -313,7 +312,7 @@ def conversa_privada(message):
     )
 
 # ==========================================
-# OUVINTE NO GRUPO (CORREÇÃO DE MENSAGENS)
+# MESSAGE CORRECTION
 # ==========================================
 @bot.message_handler(content_types=['text'], func=lambda message: message.chat.type in ['group', 'supergroup'])
 def monitorar_mensagens_grupo(message):
@@ -344,7 +343,7 @@ def monitorar_mensagens_grupo(message):
             print(f"❌ [ERRO] Falha ao enviar no privado: {e}", flush=True)
 
 # ==========================================
-# INICIAR O SERVIÇO
+# INITIATE
 # ==========================================
 def run_bot():
     print("⏳ Aguardando 10 segundos para iniciar...", flush=True)
